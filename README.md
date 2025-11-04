@@ -2,32 +2,13 @@
 
 ![WorkAdventure office image](README-MAP.png)
 
-# WorkAdventure
+# Trench World
 
 
-WorkAdventure is a platform that allows you to design **fully customizable collaborative virtual worlds** (metaverse). 
+Trench World is a platform that allows you to design **fully customizable collaborative virtual worlds** (metaverse). 
 
 With your own avatar, you can **interact spontaneously** with your colleagues, clients, partners (using a **video-chat system**, triggered when you approach someone).
 Imagine **all types of immersive experiences** (recruitments, onboarding, trainings, digital workplace, internal/external events) on desktop, mobile or tablet.
-
-_The little plus? The platform is **GDPR** and **open source**!_
-
-**See more features for your [virtual office](https://workadventu.re/virtual-offices/virtual-meetings/?utm_source=github)!**
-
-**Pricing for our [SaaS version](https://workadventu.re/pricing/?utm_source=github)!**
-
-
-[![Workadventure live demo example](https://workadventu.re/wp-content/uploads/2024/02/Button-Live-Demo.png)](https://play.staging.workadventu.re/@/tcm/workadventure/wa-village/?utm_source=github)
-[![Workadventure Website](https://workadventu.re/wp-content/uploads/2024/02/Button-Website.png)](https://workadventu.re/?utm_source=github)
-
-
-###### Support our team!
-[![Discord Logo](https://workadventu.re/wp-content/uploads/2024/02/Icon-Discord.png)](https://discord.com/invite/G6Xh9ZM9aR)
-[![X Social Logo](https://workadventu.re/wp-content/uploads/2024/02/Icon-X.png)](https://twitter.com/Workadventure_)
-[![LinkedIn Logo](https://workadventu.re/wp-content/uploads/2024/02/Icon-LinkedIn.png)](https://www.linkedin.com/company/workadventu-re/)
-
-
-![Stats repo](https://github-readme-stats.vercel.app/api?username={username}&theme=transparent)
 
 
 
