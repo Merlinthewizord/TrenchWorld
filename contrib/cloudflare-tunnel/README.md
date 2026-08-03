@@ -14,6 +14,30 @@ boards work natively.
 - A machine that stays on
 - For the **named** tunnel only: a free Cloudflare account with a domain on it
 
+## Local only, no tunnel
+
+If you just want it running on one machine — to try it, develop against it, or
+check it works before exposing it:
+
+```console
+$ ./contrib/cloudflare-tunnel/start-local.sh          # http://localhost:8080
+$ ./contrib/cloudflare-tunnel/start-local.sh 9000     # or pick a port
+```
+
+Neither tunnel profile is enabled, so cloudflared never starts, and Traefik is
+bound to `127.0.0.1` — nothing is reachable off the machine, not even from your
+LAN. The script waits for the stack to come up and reports whether `play`
+reached `back` over gRPC before telling you it is ready.
+
+Config lands in `.env.local` (gitignored), separate from the tunnel's `.env`,
+so the two modes do not clobber each other.
+
+Note the `DOMAIN` / `PUBLIC_HOST` split in that file. Traefik's ``Host(`…`)``
+matcher works on the hostname alone, but the URLs baked into the front end need
+the port too — hence `DOMAIN=localhost` alongside `PUBLIC_HOST=localhost:8080`.
+`SCHEME=http` exists for the same reason: everything else here runs behind
+Cloudflare's TLS and defaults to `https`.
+
 ## Quick start (no account, no domain)
 
 ```console

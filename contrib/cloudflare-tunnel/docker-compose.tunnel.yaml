@@ -49,14 +49,14 @@ services:
   play:
     image: thecodingmachine/workadventure-play:${VERSION:-master}
     environment:
-      - PUSHER_URL=https://${DOMAIN}/
+      - PUSHER_URL=${SCHEME:-https}://${PUBLIC_HOST:-${DOMAIN}}/
       - FRONT_URL=/
       - API_URL=back:50051
       - SECRET_KEY=${SECRET_KEY}
       - ICON_URL=/icon
       - UPLOADER_URL=/uploader
       - INTERNAL_MAP_STORAGE_URL=http://map-storage:3000
-      - PUBLIC_MAP_STORAGE_URL=https://${DOMAIN}/map-storage
+      - PUBLIC_MAP_STORAGE_URL=${SCHEME:-https}://${PUBLIC_HOST:-${DOMAIN}}/map-storage
       - MAP_STORAGE_API_TOKEN=${SECRET_KEY}
       - START_ROOM_URL=${START_ROOM_URL:-/_/global/workadventure.github.io/map-starter-kit/office.tmj}
       - ENABLE_MAP_EDITOR=${ENABLE_MAP_EDITOR:-true}
@@ -86,13 +86,13 @@ services:
   back:
     image: thecodingmachine/workadventure-back:${VERSION:-master}
     environment:
-      - PLAY_URL=https://${DOMAIN}
+      - PLAY_URL=${SCHEME:-https}://${PUBLIC_HOST:-${DOMAIN}}
       - SECRET_KEY=${SECRET_KEY}
       - REDIS_HOST=redis
       - ENABLE_MAP_EDITOR=${ENABLE_MAP_EDITOR:-true}
       - MAP_STORAGE_URL=map-storage:50053
       - INTERNAL_MAP_STORAGE_URL=http://map-storage:3000
-      - PUBLIC_MAP_STORAGE_URL=https://${DOMAIN}/map-storage
+      - PUBLIC_MAP_STORAGE_URL=${SCHEME:-https}://${PUBLIC_HOST:-${DOMAIN}}/map-storage
       - STORE_VARIABLES_FOR_LOCAL_MAPS=true
       - MAX_PER_GROUP=${MAX_PER_GROUP:-4}
       - ENABLE_CHAT=true
@@ -113,7 +113,7 @@ services:
       API_URL: back:50051
       SECRET_KEY: ${SECRET_KEY}
       MAP_STORAGE_API_TOKEN: ${SECRET_KEY}
-      PUSHER_URL: https://${DOMAIN}/
+      PUSHER_URL: ${SCHEME:-https}://${PUBLIC_HOST:-${DOMAIN}}/
       PATH_PREFIX: /map-storage
       ENABLE_BASIC_AUTHENTICATION: "true"
       AUTHENTICATION_USER: ${MAP_STORAGE_AUTHENTICATION_USER:-admin}
@@ -135,7 +135,7 @@ services:
       # No AWS_* set, so S3StorageProvider.isEnabled() is false and uploads
       # fall back to Redis. Cloudflare's free plan caps request bodies at
       # 100MB regardless of UPLOAD_MAX_FILESIZE.
-      - UPLOADER_URL=https://${DOMAIN}/uploader
+      - UPLOADER_URL=${SCHEME:-https}://${PUBLIC_HOST:-${DOMAIN}}/uploader
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - ENABLE_CHAT_UPLOAD=true

@@ -1,0 +1,22 @@
+# Local-only overlay: run Trench World without any tunnel.
+#
+# docker-compose.tunnel.yaml deliberately publishes no host ports, because in
+# the tunnel setup cloudflared is the only way in. This overlay publishes
+# Traefik so you can reach the stack directly.
+#
+# Bound to 127.0.0.1 so nothing is exposed to your LAN. Change to "8080:80" if
+# you want other machines on the network to reach it.
+#
+#   ./contrib/cloudflare-tunnel/start-local.sh
+#
+# or by hand:
+#
+#   docker compose -f contrib/cloudflare-tunnel/docker-compose.tunnel.yaml \
+#                  -f contrib/cloudflare-tunnel/docker-compose.local.yaml up -d
+#
+# Neither tunnel profile is enabled here, so cloudflared never starts.
+
+services:
+  reverse-proxy:
+    ports:
+      - "127.0.0.1:${LOCAL_PORT:-8080}:80"
