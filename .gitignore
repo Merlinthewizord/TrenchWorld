@@ -25,3 +25,6 @@ synapse/homeserver.yaml
 synapse/media_store/*
 
 .vscode/settings.json
+
+# Render deploy secrets
+.render-secrets.env
