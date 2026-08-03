@@ -1,0 +1,172 @@
+# Trench World behind a Cloudflare Tunnel.
+#
+# Cloudflare terminates TLS at the edge and forwards plain HTTP to Traefik over
+# the Docker network, so this file drops LetsEncrypt and the websecure
+# entrypoint entirely. Traefik publishes no host ports: the only way in is the
+# tunnel, which means no port forwarding and no public IP on the host.
+#
+# Because the tunnel presents a single hostname, the path-prefix routing from
+# docker-compose.prod.yaml is kept as-is.
+#
+#   docker compose -f contrib/cloudflare-tunnel/docker-compose.tunnel.yaml \
+#     --profile quick up -d
+#
+# See README.md in this directory.
+
+services:
+  reverse-proxy:
+    image: traefik:v2.11
+    command:
+      - --log.level=${LOG_LEVEL:-WARN}
+      - --providers.docker
+      - --providers.docker.exposedbydefault=false
+      - --entryPoints.web.address=:80
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  # --- tunnel: pick exactly one profile ------------------------------------
+  # quick: no account, no domain. Cloudflare assigns a random *.trycloudflare.com
+  # hostname that changes on every restart. Read it out of the logs and put it in
+  # DOMAIN, then restart the stack (see README).
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    profiles: ["quick"]
+    command: tunnel --no-autoupdate --url http://reverse-proxy:80
+    depends_on: [reverse-proxy]
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  # named: free Cloudflare account with a domain. Stable hostname, survives
+  # restarts. Create the tunnel in the Zero Trust dashboard and paste its token.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["named"]
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    depends_on: [reverse-proxy]
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  # --- application ---------------------------------------------------------
+  play:
+    image: thecodingmachine/workadventure-play:${VERSION:-master}
+    environment:
+      - PUSHER_URL=https://${DOMAIN}/
+      - FRONT_URL=/
+      - API_URL=back:50051
+      - SECRET_KEY=${SECRET_KEY}
+      - ICON_URL=/icon
+      - UPLOADER_URL=/uploader
+      - INTERNAL_MAP_STORAGE_URL=http://map-storage:3000
+      - PUBLIC_MAP_STORAGE_URL=https://${DOMAIN}/map-storage
+      - MAP_STORAGE_API_TOKEN=${SECRET_KEY}
+      - START_ROOM_URL=${START_ROOM_URL:-/_/global/workadventure.github.io/map-starter-kit/office.tmj}
+      - ENABLE_MAP_EDITOR=${ENABLE_MAP_EDITOR:-true}
+      - DISABLE_ANONYMOUS=${DISABLE_ANONYMOUS:-false}
+      - MAX_PER_GROUP=${MAX_PER_GROUP:-4}
+      - MAX_USERNAME_LENGTH=10
+      - ENABLE_CHAT=true
+      - ENABLE_CHAT_UPLOAD=true
+      # No TURN: Cloudflare Tunnel cannot proxy UDP. Video stays peer-to-peer,
+      # which works for groups up to MAX_PER_GROUP. STUN is enough for that.
+      - STUN_SERVER=${STUN_SERVER:-stun:stun.l.google.com:19302}
+      - ROOM_API_SECRET_KEY=${ROOM_API_SECRET_KEY:-}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.play.rule: "Host(`${DOMAIN}`) && PathPrefix(`/`)"
+      traefik.http.routers.play.entryPoints: "web"
+      traefik.http.routers.play.service: "play"
+      traefik.http.services.play.loadbalancer.server.port: "3000"
+      # WebSocket upgrades for the game connection.
+      traefik.http.routers.play-ws.rule: "Host(`${DOMAIN}`) && PathPrefix(`/ws/`)"
+      traefik.http.routers.play-ws.entryPoints: "web"
+      traefik.http.routers.play-ws.service: "play-ws"
+      traefik.http.services.play-ws.loadbalancer.server.port: "3000"
+    depends_on: [back]
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  back:
+    image: thecodingmachine/workadventure-back:${VERSION:-master}
+    environment:
+      - PLAY_URL=https://${DOMAIN}
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_HOST=redis
+      - ENABLE_MAP_EDITOR=${ENABLE_MAP_EDITOR:-true}
+      - MAP_STORAGE_URL=map-storage:50053
+      - INTERNAL_MAP_STORAGE_URL=http://map-storage:3000
+      - PUBLIC_MAP_STORAGE_URL=https://${DOMAIN}/map-storage
+      - STORE_VARIABLES_FOR_LOCAL_MAPS=true
+      - MAX_PER_GROUP=${MAX_PER_GROUP:-4}
+      - ENABLE_CHAT=true
+      - STUN_SERVER=${STUN_SERVER:-stun:stun.l.google.com:19302}
+    labels:
+      traefik.enable: "true"
+      traefik.http.middlewares.strip-api-prefix.stripprefix.prefixes: "/api"
+      traefik.http.routers.back.rule: "Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      traefik.http.routers.back.middlewares: "strip-api-prefix@docker"
+      traefik.http.routers.back.entryPoints: "web"
+      traefik.http.services.back.loadbalancer.server.port: "8080"
+    depends_on: [redis]
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  map-storage:
+    image: thecodingmachine/workadventure-map-storage:${VERSION:-master}
+    environment:
+      API_URL: back:50051
+      SECRET_KEY: ${SECRET_KEY}
+      MAP_STORAGE_API_TOKEN: ${SECRET_KEY}
+      PUSHER_URL: https://${DOMAIN}/
+      PATH_PREFIX: /map-storage
+      ENABLE_BASIC_AUTHENTICATION: "true"
+      AUTHENTICATION_USER: ${MAP_STORAGE_AUTHENTICATION_USER:-admin}
+      AUTHENTICATION_PASSWORD: ${MAP_STORAGE_AUTHENTICATION_PASSWORD}
+    volumes:
+      - map-storage-data:/maps
+    labels:
+      traefik.enable: "true"
+      traefik.http.middlewares.strip-map-storage-prefix.stripprefix.prefixes: "/map-storage"
+      traefik.http.routers.map-storage.rule: "Host(`${DOMAIN}`) && PathPrefix(`/map-storage`)"
+      traefik.http.routers.map-storage.middlewares: "strip-map-storage-prefix@docker"
+      traefik.http.routers.map-storage.entryPoints: "web"
+      traefik.http.services.map-storage.loadbalancer.server.port: "3000"
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  uploader:
+    image: thecodingmachine/workadventure-uploader:${VERSION:-master}
+    environment:
+      # No AWS_* set, so S3StorageProvider.isEnabled() is false and uploads
+      # fall back to Redis. Cloudflare's free plan caps request bodies at
+      # 100MB regardless of UPLOAD_MAX_FILESIZE.
+      - UPLOADER_URL=https://${DOMAIN}/uploader
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENABLE_CHAT_UPLOAD=true
+      - UPLOAD_MAX_FILESIZE=${UPLOAD_MAX_FILESIZE:-10485760}
+    labels:
+      traefik.enable: "true"
+      traefik.http.middlewares.strip-uploader-prefix.stripprefix.prefixes: "/uploader"
+      traefik.http.routers.uploader.rule: "Host(`${DOMAIN}`) && PathPrefix(`/uploader`)"
+      traefik.http.routers.uploader.middlewares: "strip-uploader-prefix@docker"
+      traefik.http.routers.uploader.entryPoints: "web"
+      traefik.http.services.uploader.loadbalancer.server.port: "8080"
+    depends_on: [redis]
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  icon:
+    image: matthiasluedtke/iconserver:v3.21.0
+    labels:
+      traefik.enable: "true"
+      traefik.http.middlewares.strip-icon-prefix.stripprefix.prefixes: "/icon"
+      traefik.http.routers.icon.rule: "Host(`${DOMAIN}`) && PathPrefix(`/icon`)"
+      traefik.http.routers.icon.middlewares: "strip-icon-prefix@docker"
+      traefik.http.routers.icon.entryPoints: "web"
+      traefik.http.services.icon.loadbalancer.server.port: "8080"
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  redis:
+    image: redis:6
+    volumes:
+      - redisdata:/data
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+volumes:
+  redisdata:
+  map-storage-data:

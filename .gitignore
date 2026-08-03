@@ -28,3 +28,4 @@ synapse/media_store/*
 
 # Render deploy secrets
 .render-secrets.env
+contrib/cloudflare-tunnel/.env
